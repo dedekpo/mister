@@ -1,5 +1,5 @@
 import type * as THREE from "three";
-import { trait } from "koota";
+import { relation, trait, type Entity } from "koota";
 
 export type LevelId = "CB" | "CDM" | "CM" | "CAM" | "ST";
 export type WideRoleId = "FB" | "WB" | "W";
@@ -7,6 +7,7 @@ export type PlayerRoleId = "GK" | LevelId | WideRoleId;
 export type RosterRoleId = Exclude<PlayerRoleId, "GK">;
 
 export type TeamSideId = "home" | "away";
+export const TEAM_SIDES: readonly TeamSideId[] = ["home", "away"];
 
 export const Position = trait({ x: 0, y: 0, z: 0 });
 export const TargetPosition = trait({ x: 0, z: 0 });
@@ -19,3 +20,35 @@ export const RosterSlot = trait({ index: 0, count: 1 });
 export const TeamSide = trait({ side: "home" as TeamSideId });
 export const Possession = trait({ side: "home" as TeamSideId });
 export const SceneRef = trait(() => null as THREE.Object3D | null);
+
+export const BallCarried = trait();
+export const BallInFlight = trait();
+export const BallLoose = trait();
+export const CarriedBy = relation({ exclusive: true });
+export const IsCarrier = trait();
+
+export type FlightResolutionKind = "received";
+export const BallFlight = trait({
+  fromX: 0,
+  fromZ: 0,
+  toX: 0,
+  toZ: 0,
+  elapsedSeconds: 0,
+  durationSeconds: 0,
+  arcHeight: 0,
+});
+export const FlightResolution = trait({
+  claimant: 0 as Entity,
+  passer: 0 as Entity,
+  kind: "received" as FlightResolutionKind,
+});
+export const BallRoll = trait({ vx: 0, vz: 0 });
+
+export const IsReceiver = trait();
+export const IsChaser = trait();
+export const ChaseReassignCooldown = trait({ remainingSeconds: 0 });
+
+export const CarrierDecision = trait({ thinkRemainingSeconds: 0 });
+export const LastPassFrom = relation({ exclusive: true });
+
+export const MatchRandom = trait({ state: 0 });

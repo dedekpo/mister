@@ -24,7 +24,7 @@ export interface AnchorRequest {
   isAttacking: boolean;
 }
 
-function attackDirection(side: TeamSideId): 1 | -1 {
+export function attackDirection(side: TeamSideId): 1 | -1 {
   return side === "home" ? 1 : -1;
 }
 

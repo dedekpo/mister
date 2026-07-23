@@ -26,3 +26,7 @@ export function lerp(from: number, to: number, ratio: number) {
 export function inverseLerp(from: number, to: number, value: number) {
   return (value - from) / (to - from);
 }
+
+export function parabolicArcHeight(peak: number, progress: number) {
+  return peak * 4 * progress * (1 - progress);
+}

@@ -1,10 +1,13 @@
-import type { World } from "koota";
+import { Not, type World } from "koota";
 import { GAME_CONFIG } from "../../data/game-config";
 import { computeAnchor, projectTacticalSlot } from "../formation";
 import { clamp } from "../math";
 import {
   IsBall,
+  IsCarrier,
+  IsChaser,
   IsPlayer,
+  IsReceiver,
   PlayerRole,
   Position,
   Possession,
@@ -27,7 +30,14 @@ export function positioningSystem(world: World) {
   if (!ballPosition) return;
 
   world
-    .query(IsPlayer, TargetPosition, PlayerRole, TeamSide, RosterSlot)
+    .query(
+      IsPlayer,
+      TargetPosition,
+      PlayerRole,
+      TeamSide,
+      RosterSlot,
+      Not(IsCarrier, IsReceiver, IsChaser),
+    )
     .updateEach(([target, playerRole, teamSide, slot], entity) => {
       const isAttacking = possession.side === teamSide.side;
       const override = entity.get(TacticalOverride);

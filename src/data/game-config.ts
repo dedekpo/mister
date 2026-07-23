@@ -21,6 +21,50 @@ const BALL_CIRCUMFERENCE = 0.69;
 const SIMULATION_TICK_RATE_HZ = 60;
 
 export const GAME_CONFIG = {
+  MATCH: {
+    SEED: 42,
+    KICKOFF_ROLE_PRIORITY: [
+      "ST",
+      "CAM",
+      "CM",
+      "CDM",
+      "W",
+      "WB",
+      "FB",
+      "CB",
+    ] satisfies RosterRoleId[],
+  },
+  BALL_CONTROL: {
+    CARRY_OFFSET_M: 0.5,
+    CLAIM_RADIUS_M: 1.2,
+  },
+  PASSING: {
+    GROUND_SPEED_MPS: 18,
+    LOFTED_SPEED_MPS: 14,
+    LOFTED_ARC_HEIGHT_M: 6,
+    MIN_DISTANCE_M: 1,
+    ARRIVAL_GRACE: 1.5,
+    LANDING_ROLL_FACTOR: 0.35,
+  },
+  LOOSE_BALL: {
+    FRICTION_PER_SECOND: 1.4,
+    MIN_ROLL_SPEED_MPS: 0.3,
+  },
+  DUTIES: {
+    CHASERS_PER_SIDE: 2,
+    CHASE_REASSIGN_SECONDS: 0.25,
+  },
+  CARRIER_AI: {
+    THINK_SECONDS_MIN: 0.4,
+    THINK_SECONDS_MAX: 0.9,
+    PICK_TEMPERATURE: 0.15,
+    WEIGHT_OPENNESS: 1.0,
+    WEIGHT_PROGRESSION: 0.8,
+    WEIGHT_BACKPASS_PENALTY: 1.2,
+    GROUND_MAX_RANGE_M: 30,
+    LOFTED_MAX_RANGE_M: 50,
+    OPENNESS_CAP_M: 10,
+  },
   FIELD: {
     LENGTH: 105,
     WIDTH: 68,
@@ -129,5 +173,9 @@ export const GAME_CONFIG = {
     COACH_DOT_RADIUS: 3,
     COACH_DOT_FONT_SIZE: 2.2,
     COACH_OVERRIDE_COLOR: "#facc15",
+    CARRIER_RING_INNER_RADIUS: 0.45,
+    CARRIER_RING_OUTER_RADIUS: 0.65,
+    CARRIER_RING_COLOR: "#facc15",
+    CARRIER_RING_LIFT: 0.03,
   },
 };
