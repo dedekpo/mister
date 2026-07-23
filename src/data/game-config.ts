@@ -130,4 +130,4 @@ export const GAME_CONFIG = {
     COACH_DOT_FONT_SIZE: 2.2,
     COACH_OVERRIDE_COLOR: "#facc15",
   },
-} ;
+};

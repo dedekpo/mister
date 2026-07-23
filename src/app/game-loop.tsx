@@ -5,7 +5,7 @@ import { GAME_CONFIG } from "../data/game-config";
 import { positioningSystem } from "../core/systems/positioning-system";
 import { movementSystem } from "../core/systems/movement-system";
 import { syncTransformSystem } from "../core/systems/sync-transform-system";
-import { syncDebugTargetsSystem } from "../core/systems/sync-debug-targets-system";
+import { syncDebugTargetsSystem } from "../features/debug/sync-debug-targets-system";
 
 const SIMULATION = GAME_CONFIG.SIMULATION;
 

@@ -1,4 +1,5 @@
 import type { Entity, World } from "koota";
+import { upsertTrait } from "../upsert-trait";
 import {
   IsPlayer,
   TacticalOverride,
@@ -11,11 +12,7 @@ export function setTacticalOverride(
   lane: number,
   depth: number,
 ) {
-  if (entity.has(TacticalOverride)) {
-    entity.set(TacticalOverride, { lane, depth });
-    return;
-  }
-  entity.add(TacticalOverride({ lane, depth }));
+  upsertTrait(entity, TacticalOverride, { lane, depth });
 }
 
 export function clearTeamTacticalOverrides(world: World, side: TeamSideId) {

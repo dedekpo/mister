@@ -24,15 +24,15 @@ export interface AnchorRequest {
   isAttacking: boolean;
 }
 
-export function attackDirection(side: TeamSideId): 1 | -1 {
+function attackDirection(side: TeamSideId): 1 | -1 {
   return side === "home" ? 1 : -1;
 }
 
-export function isWideRole(role: PlayerRoleId): role is WideRoleId {
+function isWideRole(role: PlayerRoleId): role is WideRoleId {
   return role in TACTICS.WIDE;
 }
 
-export function levelSlotOffset(
+function levelSlotOffset(
   slotIndex: number,
   slotCount: number,
   bandWidth: number,
@@ -40,7 +40,7 @@ export function levelSlotOffset(
   return ((slotIndex + 1) / (slotCount + 1) - 0.5) * bandWidth;
 }
 
-export function wideFlankZ(slotIndex: number, flankZ: number) {
+function wideFlankZ(slotIndex: number, flankZ: number) {
   return slotIndex % 2 === 0 ? -flankZ : flankZ;
 }
 

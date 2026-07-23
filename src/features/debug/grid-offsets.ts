@@ -1,6 +1,6 @@
 import { GAME_CONFIG } from "../../data/game-config";
 
-export function gridOffsets(halfExtent: number) {
+function gridOffsets(halfExtent: number) {
   const offsets = [0];
   for (
     let offset = GAME_CONFIG.DEBUG.GRID_CELL_SIZE;

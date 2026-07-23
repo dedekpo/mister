@@ -3,12 +3,20 @@ export interface Point2D {
   z: number;
 }
 
+export interface Displacement2D {
+  dx: number;
+  dz: number;
+  distance: number;
+}
+
 export function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-export function distance2D(a: Point2D, b: Point2D) {
-  return Math.hypot(b.x - a.x, b.z - a.z);
+export function displacement2D(from: Point2D, to: Point2D): Displacement2D {
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  return { dx, dz, distance: Math.hypot(dx, dz) };
 }
 
 export function lerp(from: number, to: number, ratio: number) {

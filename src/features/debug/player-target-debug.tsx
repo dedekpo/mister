@@ -2,12 +2,8 @@ import { useEffect, useRef } from "react";
 import type { ArrowHelper, Mesh } from "three";
 import type { Entity } from "koota";
 import { useQuery, useTrait } from "koota/react";
-import {
-  DebugTargetRefs,
-  IsPlayer,
-  TargetPosition,
-  TeamSide,
-} from "../../core/traits";
+import { IsPlayer, TargetPosition, TeamSide } from "../../core/traits";
+import { DebugTargetRefs } from "./debug-target-refs";
 import { GAME_CONFIG } from "../../data/game-config";
 import { teamColor } from "../players/team-color";
 

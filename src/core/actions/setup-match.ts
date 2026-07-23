@@ -6,6 +6,7 @@ import {
   IsPlayer,
   PlayerRole,
   Position,
+  RosterSlot,
   Speed,
   TargetPosition,
   TeamSide,
@@ -15,7 +16,7 @@ import {
 } from "../traits";
 import { setPossession } from "./possession";
 
-export function spawnPlayer(
+function spawnPlayer(
   world: World,
   side: TeamSideId,
   role: PlayerRoleId,
@@ -33,13 +34,14 @@ export function spawnPlayer(
     IsPlayer,
     TeamSide({ side }),
     PlayerRole({ role }),
+    RosterSlot({ index: slotIndex, count: slotCount }),
     Position({ x: anchor.x, y: 0, z: anchor.z }),
     TargetPosition({ x: anchor.x, z: anchor.z }),
     Speed({ metersPerSecond: GAME_CONFIG.PLAYER.RUN_SPEED_MPS }),
   );
 }
 
-export function spawnTeam(world: World, side: TeamSideId, roster: RosterCounts) {
+function spawnTeam(world: World, side: TeamSideId, roster: RosterCounts) {
   spawnPlayer(world, side, "GK", 0, 1);
   (Object.entries(roster) as [RosterRoleId, number][]).forEach(
     ([role, count]) => {
@@ -50,11 +52,11 @@ export function spawnTeam(world: World, side: TeamSideId, roster: RosterCounts) 
   );
 }
 
-export function spawnBall(world: World) {
+function spawnBall(world: World) {
   return world.spawn(IsBall, Position({ x: 0, y: GAME_CONFIG.BALL.RADIUS, z: 0 }));
 }
 
-export function clearMatch(world: World) {
+function clearMatch(world: World) {
   const matchEntities = [...world.query(IsPlayer), ...world.query(IsBall)];
   matchEntities.forEach((entity) => entity.destroy());
 }

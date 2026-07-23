@@ -5,16 +5,13 @@ import { useQuery, useTrait, useWorld } from "koota/react";
 import {
   IsPlayer,
   PlayerRole,
+  RosterSlot,
   TacticalOverride,
   TeamSide,
   type TeamSideId,
 } from "../../core/traits";
 import { defaultTacticalSlot, type TacticalSlot } from "../../core/formation";
 import { clamp } from "../../core/math";
-import {
-  buildSlotAssignments,
-  type SlotAssignment,
-} from "../../core/systems/positioning-system";
 import {
   clearTeamTacticalOverrides,
   setTacticalOverride,
@@ -137,23 +134,26 @@ function BoardMarkings() {
 
 function BoardDot({
   entity,
-  slot,
-  side,
+  boardSide,
   dragSlot,
   onStartDrag,
 }: {
   entity: Entity;
-  slot: SlotAssignment;
-  side: TeamSideId;
+  boardSide: TeamSideId;
   dragSlot: TacticalSlot | null;
   onStartDrag: (event: ReactPointerEvent) => void;
 }) {
   const override = useTrait(entity, TacticalOverride);
-  const role = entity.get(PlayerRole)?.role;
-  if (!role) return null;
+  const role = useTrait(entity, PlayerRole);
+  const teamSide = useTrait(entity, TeamSide);
+  const slot = useTrait(entity, RosterSlot);
+  if (!role || !teamSide || !slot) return null;
+  if (teamSide.side !== boardSide) return null;
 
   const tactical =
-    dragSlot ?? override ?? defaultTacticalSlot(role, slot.index, slot.count);
+    dragSlot ??
+    override ??
+    defaultTacticalSlot(role.role, slot.index, slot.count);
 
   return (
     <g
@@ -163,7 +163,7 @@ function BoardDot({
     >
       <circle
         r={DEBUG.COACH_DOT_RADIUS}
-        fill={teamColor(side)}
+        fill={teamColor(teamSide.side)}
         stroke={override ? DEBUG.COACH_OVERRIDE_COLOR : "white"}
         strokeWidth={0.5}
       />
@@ -174,7 +174,7 @@ function BoardDot({
         fill="white"
         pointerEvents="none"
       >
-        {role}
+        {role.role}
       </text>
     </g>
   );
@@ -183,16 +183,13 @@ function BoardDot({
 function TacticalBoard({ side }: { side: TeamSideId }) {
   const world = useWorld();
   const svgRef = useRef<SVGSVGElement>(null);
-  const players = useQuery(IsPlayer, PlayerRole, TeamSide);
+  const players = useQuery(IsPlayer, PlayerRole, TeamSide, RosterSlot);
   const [drag, setDrag] = useState<DragState | null>(null);
 
-  const teamPlayers = players.filter(
-    (entity) => entity.get(TeamSide)?.side === side,
-  );
-  const assignments = buildSlotAssignments(world);
-
-  const toSlot = (event: ReactPointerEvent) => {
-    const bounds = svgRef.current!.getBoundingClientRect();
+  const toSlot = (event: ReactPointerEvent): TacticalSlot | null => {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const bounds = svg.getBoundingClientRect();
     return snapToCell(
       (event.clientX - bounds.left) / bounds.width,
       (event.clientY - bounds.top) / bounds.height,
@@ -200,13 +197,17 @@ function TacticalBoard({ side }: { side: TeamSideId }) {
   };
 
   const startDrag = (entity: Entity) => (event: ReactPointerEvent) => {
+    const slot = toSlot(event);
+    if (!slot) return;
     svgRef.current?.setPointerCapture(event.pointerId);
-    setDrag({ entity, ...toSlot(event) });
+    setDrag({ entity, ...slot });
   };
 
   const moveDrag = (event: ReactPointerEvent) => {
     if (!drag) return;
-    setDrag({ entity: drag.entity, ...toSlot(event) });
+    const slot = toSlot(event);
+    if (!slot) return;
+    setDrag({ entity: drag.entity, ...slot });
   };
 
   const endDrag = () => {
@@ -219,9 +220,8 @@ function TacticalBoard({ side }: { side: TeamSideId }) {
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between">
         <span
-          className={`text-xs font-semibold uppercase tracking-wide ${
-            side === "home" ? "text-red-400" : "text-blue-400"
-          }`}
+          className="text-xs font-semibold uppercase tracking-wide"
+          style={{ color: teamColor(side) }}
         >
           {side}
         </span>
@@ -241,20 +241,15 @@ function TacticalBoard({ side }: { side: TeamSideId }) {
         onPointerUp={endDrag}
       >
         <BoardMarkings />
-        {teamPlayers.map((entity) => {
-          const slot = assignments.get(entity);
-          if (!slot) return null;
-          return (
-            <BoardDot
-              key={entity}
-              entity={entity}
-              slot={slot}
-              side={side}
-              dragSlot={drag?.entity === entity ? drag : null}
-              onStartDrag={startDrag(entity)}
-            />
-          );
-        })}
+        {players.map((entity) => (
+          <BoardDot
+            key={entity}
+            entity={entity}
+            boardSide={side}
+            dragSlot={drag?.entity === entity ? drag : null}
+            onStartDrag={startDrag(entity)}
+          />
+        ))}
       </svg>
     </div>
   );

@@ -4,6 +4,7 @@ import { Possession, type TeamSideId } from "../../core/traits";
 import { setPossession } from "../../core/actions/possession";
 import { teleportBall } from "../../core/actions/ball";
 import { GAME_CONFIG } from "../../data/game-config";
+import { teamColor } from "../players/team-color";
 import MinimapPitch from "./minimap-pitch";
 
 const FIELD = GAME_CONFIG.FIELD;
@@ -27,11 +28,14 @@ function PossessionFlipper() {
             onClick={() => setPossession(world, side)}
             className={`flex-1 px-3 py-1 text-sm uppercase transition-colors ${
               possession.side === side
-                ? side === "home"
-                  ? "bg-red-600 text-white"
-                  : "bg-blue-600 text-white"
+                ? "text-white"
                 : "bg-transparent text-white/50 hover:text-white"
             }`}
+            style={
+              possession.side === side
+                ? { backgroundColor: teamColor(side) }
+                : undefined
+            }
           >
             {side}
           </button>
