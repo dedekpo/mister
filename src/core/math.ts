@@ -27,6 +27,10 @@ export function degreesToRadians(degrees: number) {
   return (degrees * Math.PI) / 180;
 }
 
+export function radiansToDegrees(radians: number) {
+  return (radians * 180) / Math.PI;
+}
+
 export function inverseLerp(from: number, to: number, value: number) {
   return (value - from) / (to - from);
 }

@@ -31,7 +31,12 @@ export const BallLoose = trait();
 export const CarriedBy = relation({ exclusive: true });
 export const IsCarrier = trait();
 
-export type FlightResolutionKind = "received" | "intercepted";
+export type FlightResolutionKind =
+  | "received"
+  | "intercepted"
+  | "goal"
+  | "saved"
+  | "offTarget";
 export const BallFlight = trait({
   fromX: 0,
   fromZ: 0,
@@ -60,3 +65,4 @@ export const ContestTimer = trait({ remainingSeconds: 0 });
 export const ClaimLockout = trait({ remainingSeconds: 0 });
 
 export const MatchRandom = trait({ state: 0 });
+export const Score = trait({ home: 0, away: 0 });

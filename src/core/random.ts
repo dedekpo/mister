@@ -40,6 +40,10 @@ export function randomChance(world: World, probability: number): boolean {
   return nextRandom01(world) < probability;
 }
 
+export function randomSign(world: World): 1 | -1 {
+  return nextRandom01(world) < 0.5 ? -1 : 1;
+}
+
 export function randomPick<T>(world: World, items: readonly T[]): T | undefined {
   if (items.length === 0) return undefined;
   return items[Math.floor(nextRandom01(world) * items.length)];

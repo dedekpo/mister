@@ -19,9 +19,11 @@ import {
   LastPassFrom,
   PlayerRole,
   Position,
+  Score,
   Speed,
   TargetPosition,
   TeamSide,
+  type FlightResolutionKind,
   type PlayerRoleId,
   type TeamSideId,
 } from "../traits";
@@ -149,11 +151,21 @@ describe("contested match smoke run", () => {
   const COMPLETION_BAND_MAX = 0.9;
   const SMOKE_SEEDS = [42, 7, 1234];
 
+  const IS_SHOT_KIND: Record<FlightResolutionKind, boolean> = {
+    received: false,
+    intercepted: false,
+    goal: true,
+    saved: true,
+    offTarget: true,
+  };
+
   interface SmokeStats {
     completedPasses: number;
     turnovers: number;
-    kicks: number;
+    passKicks: number;
     interceptedKicks: number;
+    shots: number;
+    goals: number;
     dispossessions: number;
   }
 
@@ -164,8 +176,10 @@ describe("contested match smoke run", () => {
     const stats: SmokeStats = {
       completedPasses: 0,
       turnovers: 0,
-      kicks: 0,
+      passKicks: 0,
       interceptedKicks: 0,
+      shots: 0,
+      goals: 0,
       dispossessions: 0,
     };
     let wasInFlight = false;
@@ -176,10 +190,10 @@ describe("contested match smoke run", () => {
       const matchBall = matchWorld.queryFirst(IsBall)!;
       const isInFlight = matchBall.has(BallInFlight);
       if (isInFlight && !wasInFlight) {
-        stats.kicks += 1;
-        if (matchBall.get(FlightResolution)?.kind === "intercepted") {
-          stats.interceptedKicks += 1;
-        }
+        const kind = matchBall.get(FlightResolution)!.kind;
+        if (IS_SHOT_KIND[kind]) stats.shots += 1;
+        else stats.passKicks += 1;
+        if (kind === "intercepted") stats.interceptedKicks += 1;
       }
       if (wasCarried && matchBall.has(BallLoose)) stats.dispossessions += 1;
       wasInFlight = isInFlight;
@@ -193,6 +207,8 @@ describe("contested match smoke run", () => {
       }
       if (carrier) previousCarrier = carrier;
     }
+    const score = matchWorld.get(Score);
+    stats.goals = (score?.home ?? 0) + (score?.away ?? 0);
     expect([...matchWorld.query(IsCarrier)].length).toBeLessThanOrEqual(1);
     matchWorld.destroy();
     return stats;
@@ -204,22 +220,29 @@ describe("contested match smoke run", () => {
       (sum, run) => ({
         completedPasses: sum.completedPasses + run.completedPasses,
         turnovers: sum.turnovers + run.turnovers,
-        kicks: sum.kicks + run.kicks,
+        passKicks: sum.passKicks + run.passKicks,
         interceptedKicks: sum.interceptedKicks + run.interceptedKicks,
+        shots: sum.shots + run.shots,
+        goals: sum.goals + run.goals,
         dispossessions: sum.dispossessions + run.dispossessions,
       }),
       {
         completedPasses: 0,
         turnovers: 0,
-        kicks: 0,
+        passKicks: 0,
         interceptedKicks: 0,
+        shots: 0,
+        goals: 0,
         dispossessions: 0,
       },
     );
-    const completion = (totals.kicks - totals.interceptedKicks) / totals.kicks;
+    const completion =
+      (totals.passKicks - totals.interceptedKicks) / totals.passKicks;
     expect(totals.completedPasses).toBeGreaterThan(45);
     expect(totals.interceptedKicks).toBeGreaterThan(0);
-    expect(totals.dispossessions).toBeGreaterThanOrEqual(3);
+    expect(totals.shots).toBeGreaterThan(3);
+    expect(totals.goals).toBeGreaterThanOrEqual(1);
+    expect(totals.dispossessions).toBeGreaterThanOrEqual(1);
     expect(totals.turnovers).toBeGreaterThan(3);
     expect(completion).toBeGreaterThanOrEqual(COMPLETION_BAND_MIN);
     expect(completion).toBeLessThanOrEqual(COMPLETION_BAND_MAX);

@@ -11,11 +11,13 @@ import {
   TeamSide,
   type TeamSideId,
 } from "../traits";
+import { shotGeometry, shotQuality } from "../shooting";
 import type { DribbleCandidate, PassCandidate } from "./candidates";
 import { scoreCarrierCandidate } from "./scoring";
 
 const CARRIER_AI = GAME_CONFIG.CARRIER_AI;
 const CLEARING = GAME_CONFIG.CLEARING;
+const GOAL_LINE_X = GAME_CONFIG.FIELD.LENGTH / 2;
 
 let world: World;
 
@@ -214,5 +216,26 @@ describe("clear scoring", () => {
     expect(scoreCarrierCandidate(world, carrier, clearCandidate)).toBe(
       CLEARING.BASE_SCORE,
     );
+  });
+});
+
+describe("shot scoring", () => {
+  const shootCandidate = { kind: "shoot" } as const;
+
+  it("scores a shot by its weighted chance quality", () => {
+    const shooterX = GOAL_LINE_X - 10;
+    const carrier = spawnPlayerAt(shooterX, 0, "home");
+    expect(scoreCarrierCandidate(world, carrier, shootCandidate)).toBeCloseTo(
+      GAME_CONFIG.SHOOTING.WEIGHT_QUALITY *
+        shotQuality(shotGeometry({ x: shooterX, z: 0 }, "home")),
+    );
+  });
+
+  it("prefers close central shots over long wide ones", () => {
+    const centralShooter = spawnPlayerAt(GOAL_LINE_X - 9, 0, "home");
+    const wideShooter = spawnPlayerAt(GOAL_LINE_X - 20, 14, "home");
+    expect(
+      scoreCarrierCandidate(world, centralShooter, shootCandidate),
+    ).toBeGreaterThan(scoreCarrierCandidate(world, wideShooter, shootCandidate));
   });
 });

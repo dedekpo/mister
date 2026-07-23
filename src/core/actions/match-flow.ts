@@ -8,17 +8,20 @@ import {
   PlayerRole,
   Position,
   RosterSlot,
+  Score,
   Speed,
   TargetPosition,
   TeamSide,
   type PlayerRoleId,
   type TeamSideId,
 } from "../traits";
+import { upsertTrait } from "../upsert-trait";
 import { giveBallTo } from "./ball-control";
 import { setPossession } from "./possession";
 
 const ROSTERS = GAME_CONFIG.TACTICS.ROSTERS;
 const KICKOFF_ROLE_PRIORITY = GAME_CONFIG.MATCH.KICKOFF_ROLE_PRIORITY;
+const GOALLESS_SCORE = { home: 0, away: 0 };
 
 function spawnPlayer(
   world: World,
@@ -65,10 +68,16 @@ function spawnBall(world: World) {
 
 export function spawnMatch(world: World, kickingSide: TeamSideId = "home") {
   seedMatchRandom(world, GAME_CONFIG.MATCH.SEED);
+  upsertTrait(world, Score, GOALLESS_SCORE);
   spawnTeam(world, "home", ROSTERS.HOME);
   spawnTeam(world, "away", ROSTERS.AWAY);
   spawnBall(world);
   resetForKickoff(world, kickingSide);
+}
+
+export function recordGoal(world: World, side: TeamSideId) {
+  const score = world.get(Score) ?? GOALLESS_SCORE;
+  upsertTrait(world, Score, { ...score, [side]: score[side] + 1 });
 }
 
 export function resetForKickoff(world: World, kickingSide: TeamSideId) {

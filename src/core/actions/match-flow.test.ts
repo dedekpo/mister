@@ -1,7 +1,10 @@
 import { createWorld, type World } from "koota";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { gameplayEventPhase } from "../events/gameplay-event-phase";
+import { GoalScored } from "../events/match-events";
 import { attackDirection } from "../formation";
 import {
+  BallCarried,
   IsBall,
   IsCarrier,
   IsPlayer,
@@ -9,6 +12,7 @@ import {
   PlayerRole,
   Position,
   Possession,
+  Score,
   TeamSide,
 } from "../traits";
 import { resetForKickoff, spawnMatch } from "./match-flow";
@@ -42,6 +46,35 @@ describe("spawnMatch", () => {
 
   it("seeds the match random stream", () => {
     expect(world.has(MatchRandom)).toBe(true);
+  });
+
+  it("starts goalless", () => {
+    expect(world.get(Score)).toEqual({ home: 0, away: 0 });
+  });
+});
+
+describe("goal flow", () => {
+  it("counts the goal and restarts with the conceding side", () => {
+    world.spawn(GoalScored({ side: "home" }));
+    gameplayEventPhase(world);
+    expect(world.get(Score)).toEqual({ home: 1, away: 0 });
+    expect(world.get(Possession)?.side).toBe("away");
+    const carriers = [...world.query(IsCarrier)];
+    expect(carriers).toHaveLength(1);
+    expect(carriers[0]!.get(TeamSide)?.side).toBe("away");
+    expect(world.queryFirst(IsBall)!.has(BallCarried)).toBe(true);
+    expect([...world.query(IsPlayer)]).toHaveLength(22);
+    expect([...world.query(GoalScored)]).toHaveLength(0);
+  });
+
+  it("accumulates goals for both sides across restarts", () => {
+    world.spawn(GoalScored({ side: "home" }));
+    gameplayEventPhase(world);
+    world.spawn(GoalScored({ side: "away" }));
+    gameplayEventPhase(world);
+    world.spawn(GoalScored({ side: "away" }));
+    gameplayEventPhase(world);
+    expect(world.get(Score)).toEqual({ home: 1, away: 2 });
   });
 });
 

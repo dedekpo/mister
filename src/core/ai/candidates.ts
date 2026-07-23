@@ -4,6 +4,7 @@ import type { PassFlavor } from "../actions/kicking";
 import { attackDirection } from "../formation";
 import { degreesToRadians, displacement2D, type Point2D } from "../math";
 import { clampToPitch, isWithinPitch } from "../pitch";
+import { isShootingPosition, shotGeometry } from "../shooting";
 import {
   IsPlayer,
   PlayerRole,
@@ -35,6 +36,10 @@ export interface ClearCandidate {
   target: Point2D;
 }
 
+export interface ShootCandidate {
+  kind: "shoot";
+}
+
 export interface HoldCandidate {
   kind: "hold";
 }
@@ -43,6 +48,7 @@ export type CarrierActionCandidate =
   | PassCandidate
   | DribbleCandidate
   | ClearCandidate
+  | ShootCandidate
   | HoldCandidate;
 
 export function generateCarrierCandidates(
@@ -58,6 +64,9 @@ export function generateCarrierCandidates(
     candidates.push(...dribbleCandidates(carrierPosition, side));
   }
   candidates.push(...clearCandidates(carrierPosition, side));
+  if (isShootingPosition(shotGeometry(carrierPosition, side))) {
+    candidates.push({ kind: "shoot" });
+  }
   return candidates;
 }
 

@@ -1,7 +1,7 @@
 import { Not, type Entity, type World } from "koota";
 import { GAME_CONFIG } from "../../data/game-config";
 import { startDribble, stopDribble } from "../actions/ball-control";
-import { kickClear, kickPass } from "../actions/kicking";
+import { kickClear, kickPass, kickShot } from "../actions/kicking";
 import { generateCarrierCandidates } from "../ai/candidates";
 import { chooseCarrierAction } from "../ai/choose-carrier-action";
 import { scoreCarrierCandidates } from "../ai/scoring";
@@ -62,6 +62,10 @@ function decideCarrierAction(world: World, carrier: Entity) {
     return;
   }
   carrier.remove(CarrierDecision);
+  if (picked.kind === "shoot") {
+    kickShot(world, carrier);
+    return;
+  }
   if (picked.kind === "clear") {
     kickClear(world, carrier, picked.target);
     return;

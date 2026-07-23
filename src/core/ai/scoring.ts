@@ -6,6 +6,7 @@ import { clamp, inverseLerp, type Point2D } from "../math";
 import { OWN_GOAL_LINE_X } from "../pitch";
 import { pressureOn } from "../pressure";
 import { nearestOpponentDistance } from "../queries";
+import { shotGeometry, shotQuality } from "../shooting";
 import { LastPassFrom, Position, TeamSide, type TeamSideId } from "../traits";
 import type {
   CarrierActionCandidate,
@@ -16,6 +17,7 @@ import type {
 const CARRIER_AI = GAME_CONFIG.CARRIER_AI;
 const DRIBBLING = GAME_CONFIG.DRIBBLING;
 const CLEARING = GAME_CONFIG.CLEARING;
+const SHOOTING = GAME_CONFIG.SHOOTING;
 
 export interface ScoredCandidate {
   candidate: CarrierActionCandidate;
@@ -46,6 +48,7 @@ export function scoreCarrierCandidate(
     return scoreDribbleCandidate(world, carrier, candidate);
   }
   if (candidate.kind === "clear") return scoreClearCandidate(world, carrier);
+  if (candidate.kind === "shoot") return scoreShotCandidate(carrier);
   return unscorableCandidate(candidate);
 }
 
@@ -99,6 +102,15 @@ function scoreDribbleCandidate(
         DRIBBLING.PROBE_DISTANCE_M,
       ) +
     DRIBBLING.WEIGHT_ESCAPE * pressureOn(world, carrier) * space
+  );
+}
+
+function scoreShotCandidate(carrier: Entity): number {
+  const carrierPosition = carrier.get(Position);
+  const side = carrier.get(TeamSide)?.side;
+  if (!carrierPosition || !side) return 0;
+  return (
+    SHOOTING.WEIGHT_QUALITY * shotQuality(shotGeometry(carrierPosition, side))
   );
 }
 

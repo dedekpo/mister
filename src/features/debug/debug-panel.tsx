@@ -1,7 +1,21 @@
 import { useTrait, useWorld } from "koota/react";
-import { Possession, TEAM_SIDES } from "../../core/traits";
+import { Possession, Score, TEAM_SIDES } from "../../core/traits";
 import { giveBallToNearestOfSide } from "../../core/actions/ball-control";
 import { teamColor } from "../players/team-color";
+
+function ScoreBoard() {
+  const world = useWorld();
+  const score = useTrait(world, Score);
+  if (!score) return null;
+
+  return (
+    <div className="flex items-center justify-center gap-2 text-lg font-semibold tabular-nums">
+      <span style={{ color: teamColor("home") }}>{score.home}</span>
+      <span className="opacity-60">–</span>
+      <span style={{ color: teamColor("away") }}>{score.away}</span>
+    </div>
+  );
+}
 
 function BallGiver() {
   const world = useWorld();
@@ -41,6 +55,7 @@ function BallGiver() {
 export default function DebugPanel() {
   return (
     <div className="fixed top-4 right-4 z-10 flex select-none flex-col gap-3 rounded-lg bg-black/70 p-3 text-white">
+      <ScoreBoard />
       <BallGiver />
     </div>
   );

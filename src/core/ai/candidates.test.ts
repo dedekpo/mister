@@ -22,6 +22,7 @@ const CARRIER_AI = GAME_CONFIG.CARRIER_AI;
 const DRIBBLING = GAME_CONFIG.DRIBBLING;
 const CLEARING = GAME_CONFIG.CLEARING;
 const PITCH_MARGIN_M = GAME_CONFIG.TACTICS.PITCH_CLAMP_MARGIN;
+const GOAL_LINE_X = GAME_CONFIG.FIELD.LENGTH / 2;
 
 let world: World;
 
@@ -143,5 +144,20 @@ describe("generateCarrierCandidates", () => {
     expect(clearCandidates(advancedCarrier)[0]?.target.x).toBe(
       GAME_CONFIG.FIELD.LENGTH / 2 - PITCH_MARGIN_M,
     );
+  });
+
+  it("offers a shot only inside the shooting range and cone", () => {
+    const candidateKinds = (carrier: Entity) =>
+      generateCarrierCandidates(world, carrier).map(
+        (candidate) => candidate.kind,
+      );
+    const boxShooter = spawnPlayerAt(GOAL_LINE_X - 15, 0, "home");
+    expect(candidateKinds(boxShooter)).toContain("shoot");
+    const awayBoxShooter = spawnPlayerAt(-(GOAL_LINE_X - 15), 0, "away");
+    expect(candidateKinds(awayBoxShooter)).toContain("shoot");
+    const midfielder = spawnPlayerAt(0, 0, "home");
+    expect(candidateKinds(midfielder)).not.toContain("shoot");
+    const bylineWinger = spawnPlayerAt(GOAL_LINE_X - 5, 15, "home");
+    expect(candidateKinds(bylineWinger)).not.toContain("shoot");
   });
 });

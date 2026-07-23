@@ -34,6 +34,21 @@ export function findNearestPlayer(
   return findNearestPlayers(world, { ...request, count: 1 })[0];
 }
 
+export function findGoalkeeper(
+  world: World,
+  side: TeamSideId,
+): Entity | undefined {
+  let goalkeeper: Entity | undefined;
+  world
+    .query(IsPlayer, PlayerRole, TeamSide)
+    .readEach(([role, teamSide], entity) => {
+      if (teamSide.side !== side) return;
+      if (role.role !== "GK") return;
+      goalkeeper = entity;
+    });
+  return goalkeeper;
+}
+
 export function nearestOpponentDistance(
   world: World,
   point: Point2D,

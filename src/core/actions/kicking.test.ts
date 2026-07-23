@@ -2,11 +2,14 @@ import { createWorld, type Entity, type World } from "koota";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GAME_CONFIG } from "../../data/game-config";
 import { gameplayEventPhase } from "../events/gameplay-event-phase";
+import { GoalScored } from "../events/match-events";
 import { seedMatchRandom } from "../random";
+import { shotConversionChance, shotGeometry, shotQuality } from "../shooting";
 import {
   BallCarried,
   BallFlight,
   BallInFlight,
+  BallLoose,
   CarriedBy,
   FlightResolution,
   IsBall,
@@ -19,12 +22,17 @@ import {
   Speed,
   TargetPosition,
   TeamSide,
+  type FlightResolutionKind,
+  type PlayerRoleId,
   type TeamSideId,
 } from "../traits";
 import { claimBall, giveBallTo } from "./ball-control";
-import { kickPass, resolveFlightArrival } from "./kicking";
+import { kickPass, kickShot, resolveFlightArrival } from "./kicking";
 
 const PASSING = GAME_CONFIG.PASSING;
+const SHOOTING = GAME_CONFIG.SHOOTING;
+const GOAL_LINE_X = GAME_CONFIG.FIELD.LENGTH / 2;
+const GOAL_HALF_WIDTH = GAME_CONFIG.GOAL.WIDTH / 2;
 
 let world: World;
 
@@ -37,11 +45,16 @@ afterEach(() => {
   world.destroy();
 });
 
-function spawnPlayerAt(x: number, z: number, side: TeamSideId): Entity {
+function spawnPlayerAt(
+  x: number,
+  z: number,
+  side: TeamSideId,
+  role: PlayerRoleId = "CM",
+): Entity {
   return world.spawn(
     IsPlayer,
     TeamSide({ side }),
-    PlayerRole({ role: "CM" }),
+    PlayerRole({ role }),
     Position({ x, y: 0, z }),
     TargetPosition({ x, z }),
     Speed({ metersPerSecond: GAME_CONFIG.PLAYER.RUN_SPEED_MPS }),
@@ -187,5 +200,137 @@ describe("resolveFlightArrival", () => {
     resolveFlightArrival(world, ball());
     expect(ball().targetFor(CarriedBy)).toBe(receiver);
     expect(receiver.targetFor(LastPassFrom)).toBe(kicker);
+  });
+});
+
+describe("kickShot", () => {
+  const SHOT_POSITION = { x: GOAL_LINE_X - 9, z: 0 };
+
+  interface ShotSample {
+    kind: FlightResolutionKind;
+    toX: number;
+    toZ: number;
+    claimant: Entity;
+  }
+
+  function spawnShooterAndKeeper() {
+    const shooter = spawnPlayerAt(SHOT_POSITION.x, SHOT_POSITION.z, "home");
+    const goalkeeper = spawnPlayerAt(GOAL_LINE_X - 1.5, 0, "away", "GK");
+    seedMatchRandom(world, GAME_CONFIG.MATCH.SEED);
+    return { shooter, goalkeeper };
+  }
+
+  function sampleShots(shooter: Entity, count: number): ShotSample[] {
+    const samples: ShotSample[] = [];
+    for (let attempt = 0; attempt < count; attempt += 1) {
+      giveBallTo(world, shooter);
+      kickShot(world, shooter);
+      const resolution = ball().get(FlightResolution)!;
+      const flight = ball().get(BallFlight)!;
+      samples.push({
+        kind: resolution.kind,
+        toX: flight.toX,
+        toZ: flight.toZ,
+        claimant: resolution.claimant,
+      });
+    }
+    return samples;
+  }
+
+  function kickUntil(shooter: Entity, kind: FlightResolutionKind) {
+    for (let attempt = 0; attempt < 200; attempt += 1) {
+      giveBallTo(world, shooter);
+      kickShot(world, shooter);
+      if (ball().get(FlightResolution)?.kind === kind) return;
+    }
+    throw new Error(`no ${kind} outcome in 200 shots`);
+  }
+
+  it("rolls goal, save and miss at the pre-resolved rates", () => {
+    const { shooter } = spawnShooterAndKeeper();
+    const samples = sampleShots(shooter, 400);
+    const goals = samples.filter((sample) => sample.kind === "goal").length;
+    const saves = samples.filter((sample) => sample.kind === "saved").length;
+    const misses = samples.filter(
+      (sample) => sample.kind === "offTarget",
+    ).length;
+    expect(goals + saves + misses).toBe(samples.length);
+    expect(Math.min(goals, saves, misses)).toBeGreaterThan(0);
+    const expectedConversion = shotConversionChance(
+      shotQuality(shotGeometry(SHOT_POSITION, "home")),
+    );
+    expect(goals / samples.length).toBeCloseTo(expectedConversion, 1);
+    expect(saves / (saves + misses)).toBeCloseTo(SHOOTING.OUTCOME_SAVE_SHARE, 1);
+  });
+
+  it("aims goals inside the goal mouth on the goal line", () => {
+    const { shooter } = spawnShooterAndKeeper();
+    const goals = sampleShots(shooter, 100).filter(
+      (sample) => sample.kind === "goal",
+    );
+    expect(goals.length).toBeGreaterThan(0);
+    goals.forEach((sample) => {
+      expect(sample.toX).toBe(GOAL_LINE_X);
+      expect(Math.abs(sample.toZ)).toBeLessThanOrEqual(
+        GOAL_HALF_WIDTH * SHOOTING.GOAL_MOUTH_INSET,
+      );
+    });
+  });
+
+  it("sends saves into the goalkeeper's hands", () => {
+    const { shooter, goalkeeper } = spawnShooterAndKeeper();
+    const saves = sampleShots(shooter, 100).filter(
+      (sample) => sample.kind === "saved",
+    );
+    expect(saves.length).toBeGreaterThan(0);
+    saves.forEach((sample) => {
+      expect(sample.claimant).toBe(goalkeeper);
+      expect(sample.toX).toBeCloseTo(GOAL_LINE_X - 1.5);
+      expect(sample.toZ).toBeCloseTo(0);
+    });
+  });
+
+  it("puts misses wide of the posts but inside the pitch", () => {
+    const { shooter } = spawnShooterAndKeeper();
+    const misses = sampleShots(shooter, 100).filter(
+      (sample) => sample.kind === "offTarget",
+    );
+    expect(misses.length).toBeGreaterThan(0);
+    misses.forEach((sample) => {
+      expect(Math.abs(sample.toZ)).toBeGreaterThan(GOAL_HALF_WIDTH);
+      expect(sample.toX).toBe(
+        GOAL_LINE_X - GAME_CONFIG.TACTICS.PITCH_CLAMP_MARGIN,
+      );
+      expect(Math.abs(sample.toZ)).toBeLessThanOrEqual(
+        GAME_CONFIG.FIELD.WIDTH / 2 - GAME_CONFIG.TACTICS.PITCH_CLAMP_MARGIN,
+      );
+    });
+  });
+
+  it("ignores shots from players who are not carrying", () => {
+    const { shooter } = spawnShooterAndKeeper();
+    const bystander = spawnPlayerAt(30, 5, "home");
+    giveBallTo(world, shooter);
+    kickShot(world, bystander);
+    expect(ball().has(BallCarried)).toBe(true);
+    expect(shooter.has(IsCarrier)).toBe(true);
+  });
+
+  it("emits a goal and leaves the ball loose when a goal flight arrives", () => {
+    const { shooter } = spawnShooterAndKeeper();
+    kickUntil(shooter, "goal");
+    resolveFlightArrival(world, ball());
+    const goalEvents = [...world.query(GoalScored)];
+    expect(goalEvents).toHaveLength(1);
+    expect(goalEvents[0]!.get(GoalScored)?.side).toBe("home");
+    expect(ball().has(BallLoose)).toBe(true);
+  });
+
+  it("hands a saved shot to the goalkeeper without pass memory", () => {
+    const { shooter, goalkeeper } = spawnShooterAndKeeper();
+    kickUntil(shooter, "saved");
+    resolveFlightArrival(world, ball());
+    expect(ball().targetFor(CarriedBy)).toBe(goalkeeper);
+    expect(goalkeeper.targetFor(LastPassFrom)).toBeUndefined();
   });
 });

@@ -5,6 +5,7 @@ import {
   randomChance,
   randomPick,
   randomRange,
+  randomSign,
   seedMatchRandom,
   stepRandom,
 } from "./random";
@@ -88,6 +89,22 @@ describe("randomRange", () => {
       expect(value).toBeGreaterThanOrEqual(0.4);
       expect(value).toBeLessThan(0.9);
     }
+  });
+});
+
+describe("randomSign", () => {
+  it("splits evenly between the two directions", () => {
+    const world = createWorld();
+    seedMatchRandom(world, 12);
+    const trials = 10000;
+    let negatives = 0;
+    for (let trial = 0; trial < trials; trial += 1) {
+      const sign = randomSign(world);
+      expect(Math.abs(sign)).toBe(1);
+      if (sign === -1) negatives += 1;
+    }
+    expect(negatives / trials).toBeGreaterThan(0.47);
+    expect(negatives / trials).toBeLessThan(0.53);
   });
 });
 
