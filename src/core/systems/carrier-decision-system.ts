@@ -1,9 +1,11 @@
 import { Not, type Entity, type World } from "koota";
 import { GAME_CONFIG } from "../../data/game-config";
-import { kickPass } from "../actions/kicking";
+import { startDribble, stopDribble } from "../actions/ball-control";
+import { kickClear, kickPass } from "../actions/kicking";
 import { generateCarrierCandidates } from "../ai/candidates";
 import { chooseCarrierAction } from "../ai/choose-carrier-action";
 import { scoreCarrierCandidates } from "../ai/scoring";
+import { tickCountdown } from "../countdown";
 import { randomRange } from "../random";
 import { CarrierDecision, IsCarrier } from "../traits";
 import { upsertTrait } from "../upsert-trait";
@@ -30,7 +32,7 @@ function armNewCarriers(world: World) {
 
 function armThinkTimer(world: World, carrier: Entity) {
   upsertTrait(carrier, CarrierDecision, {
-    thinkRemainingSeconds: randomRange(
+    remainingSeconds: randomRange(
       world,
       CARRIER_AI.THINK_SECONDS_MIN,
       CARRIER_AI.THINK_SECONDS_MAX,
@@ -40,13 +42,7 @@ function armThinkTimer(world: World, carrier: Entity) {
 
 function tickThinkTimers(world: World, delta: number) {
   [...world.query(IsCarrier, CarrierDecision)].forEach((carrier) => {
-    const decision = carrier.get(CarrierDecision);
-    if (!decision) return;
-    const thinkRemainingSeconds = decision.thinkRemainingSeconds - delta;
-    if (thinkRemainingSeconds > 0) {
-      carrier.set(CarrierDecision, { thinkRemainingSeconds });
-      return;
-    }
+    if (!tickCountdown(carrier, CarrierDecision, delta)) return;
     decideCarrierAction(world, carrier);
   });
 }
@@ -56,9 +52,19 @@ function decideCarrierAction(world: World, carrier: Entity) {
   const scoredCandidates = scoreCarrierCandidates(world, carrier, candidates);
   const picked = chooseCarrierAction(world, carrier, scoredCandidates);
   if (!picked || picked.kind === "hold") {
+    stopDribble(carrier);
+    armThinkTimer(world, carrier);
+    return;
+  }
+  if (picked.kind === "dribble") {
+    startDribble(carrier, picked.target);
     armThinkTimer(world, carrier);
     return;
   }
   carrier.remove(CarrierDecision);
+  if (picked.kind === "clear") {
+    kickClear(world, carrier, picked.target);
+    return;
+  }
   kickPass(world, carrier, picked.target, picked.flavor);
 }

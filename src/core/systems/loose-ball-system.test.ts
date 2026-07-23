@@ -1,5 +1,5 @@
 import { createWorld, type Entity, type World } from "koota";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GAME_CONFIG } from "../../data/game-config";
 import { giveBallTo, releaseBallLoose } from "../actions/ball-control";
 import { kickPass } from "../actions/kicking";
@@ -35,6 +35,10 @@ let world: World;
 beforeEach(() => {
   world = createWorld();
   world.spawn(IsBall, Position({ x: 0, y: GAME_CONFIG.BALL.RADIUS, z: 0 }));
+});
+
+afterEach(() => {
+  world.destroy();
 });
 
 function spawnPlayerAt(x: number, z: number, side: TeamSideId): Entity {

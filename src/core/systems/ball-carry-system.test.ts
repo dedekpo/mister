@@ -1,5 +1,5 @@
 import { createWorld, type World } from "koota";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GAME_CONFIG } from "../../data/game-config";
 import { giveBallTo } from "../actions/ball-control";
 import {
@@ -36,6 +36,10 @@ function ballPosition() {
 
 beforeEach(() => {
   world = createWorld();
+});
+
+afterEach(() => {
+  world.destroy();
 });
 
 describe("ballCarrySystem", () => {

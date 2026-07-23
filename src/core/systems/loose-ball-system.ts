@@ -3,10 +3,10 @@ import { GAME_CONFIG } from "../../data/game-config";
 import { claimBall } from "../actions/ball-control";
 import { displacement2D } from "../math";
 import { findNearestPlayer } from "../queries";
-import { BallLoose, BallRoll, IsBall, Position } from "../traits";
+import { BallLoose, BallRoll, ClaimLockout, IsBall, Position } from "../traits";
 
 const LOOSE_BALL = GAME_CONFIG.LOOSE_BALL;
-const CLAIM_RADIUS_M = GAME_CONFIG.BALL_CONTROL.CLAIM_RADIUS_M;
+const BALL_CONTROL = GAME_CONFIG.BALL_CONTROL;
 const BALL_RADIUS = GAME_CONFIG.BALL.RADIUS;
 
 export function looseBallSystem(world: World, delta: number) {
@@ -37,11 +37,17 @@ function rollWithFriction(ball: Entity, delta: number) {
 function claimWhenReachable(world: World, ball: Entity) {
   const ballPosition = ball.get(Position);
   if (!ballPosition) return;
-  const nearest = findNearestPlayer(world, { point: ballPosition });
-  const nearestPosition = nearest?.get(Position);
-  if (!nearest || !nearestPosition) return;
-  if (displacement2D(nearestPosition, ballPosition).distance > CLAIM_RADIUS_M) {
+  const claimant = findNearestPlayer(world, {
+    point: ballPosition,
+    isEligible: (player) => !player.has(ClaimLockout),
+  });
+  const claimantPosition = claimant?.get(Position);
+  if (!claimant || !claimantPosition) return;
+  if (
+    displacement2D(claimantPosition, ballPosition).distance >
+    BALL_CONTROL.CLAIM_RADIUS_M
+  ) {
     return;
   }
-  claimBall(world, nearest);
+  claimBall(world, claimant);
 }

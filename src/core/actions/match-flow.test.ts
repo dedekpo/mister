@@ -1,5 +1,5 @@
 import { createWorld, type World } from "koota";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { attackDirection } from "../formation";
 import {
   IsBall,
@@ -18,6 +18,10 @@ let world: World;
 beforeEach(() => {
   world = createWorld();
   spawnMatch(world);
+});
+
+afterEach(() => {
+  world.destroy();
 });
 
 describe("spawnMatch", () => {

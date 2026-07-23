@@ -1,7 +1,7 @@
 import { Not, type World } from "koota";
 import { GAME_CONFIG } from "../../data/game-config";
 import { computeAnchor, projectTacticalSlot } from "../formation";
-import { clamp } from "../math";
+import { clampToPitch } from "../pitch";
 import {
   IsBall,
   IsCarrier,
@@ -18,9 +18,6 @@ import {
 } from "../traits";
 
 const TACTICS = GAME_CONFIG.TACTICS;
-const PITCH_X_LIMIT =
-  GAME_CONFIG.FIELD.LENGTH / 2 - TACTICS.PITCH_CLAMP_MARGIN;
-const PITCH_Z_LIMIT = GAME_CONFIG.FIELD.WIDTH / 2 - TACTICS.PITCH_CLAMP_MARGIN;
 
 export function positioningSystem(world: World) {
   const possession = world.get(Possession);
@@ -50,15 +47,14 @@ export function positioningSystem(world: World) {
             side: teamSide.side,
             isAttacking,
           });
-      target.x = clamp(
-        anchor.x + ballPosition.x * TACTICS.BALL_PULL_X,
-        -PITCH_X_LIMIT,
-        PITCH_X_LIMIT,
+      const pulled = clampToPitch(
+        {
+          x: anchor.x + ballPosition.x * TACTICS.BALL_PULL_X,
+          z: anchor.z + ballPosition.z * TACTICS.BALL_PULL_Z,
+        },
+        TACTICS.PITCH_CLAMP_MARGIN,
       );
-      target.z = clamp(
-        anchor.z + ballPosition.z * TACTICS.BALL_PULL_Z,
-        -PITCH_Z_LIMIT,
-        PITCH_Z_LIMIT,
-      );
+      target.x = pulled.x;
+      target.z = pulled.z;
     });
 }

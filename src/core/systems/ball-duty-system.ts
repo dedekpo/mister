@@ -1,5 +1,6 @@
 import type { Entity, World } from "koota";
 import { GAME_CONFIG } from "../../data/game-config";
+import { tickCountdown } from "../countdown";
 import { findNearestPlayers } from "../queries";
 import {
   BallCarried,
@@ -47,13 +48,9 @@ function assignReceiver(world: World, ball: Entity) {
 }
 
 function assignChasers(world: World, ball: Entity, delta: number) {
-  const remainingSeconds =
-    (world.get(ChaseReassignCooldown)?.remainingSeconds ?? 0) - delta;
   const hasChasers = world.queryFirst(IsChaser) !== undefined;
-  if (remainingSeconds > 0 && hasChasers) {
-    upsertTrait(world, ChaseReassignCooldown, { remainingSeconds });
-    return;
-  }
+  const isCoolingDown = !tickCountdown(world, ChaseReassignCooldown, delta);
+  if (isCoolingDown && hasChasers) return;
   const ballPosition = ball.get(Position);
   if (!ballPosition) return;
   const desiredChasers = new Set(

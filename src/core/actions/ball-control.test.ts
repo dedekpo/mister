@@ -1,5 +1,5 @@
 import { createWorld, type World } from "koota";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PossessionChanged } from "../events/match-events";
 import { gameplayEventPhase } from "../events/gameplay-event-phase";
 import {
@@ -29,6 +29,10 @@ let world: World;
 beforeEach(() => {
   world = createWorld();
   spawnMatch(world);
+});
+
+afterEach(() => {
+  world.destroy();
 });
 
 function carrier() {

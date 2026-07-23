@@ -9,6 +9,10 @@ export type RosterRoleId = Exclude<PlayerRoleId, "GK">;
 export type TeamSideId = "home" | "away";
 export const TEAM_SIDES: readonly TeamSideId[] = ["home", "away"];
 
+export function opposingSide(side: TeamSideId): TeamSideId {
+  return side === "home" ? "away" : "home";
+}
+
 export const Position = trait({ x: 0, y: 0, z: 0 });
 export const TargetPosition = trait({ x: 0, z: 0 });
 export const TacticalOverride = trait({ lane: 0.5, depth: 0.5 });
@@ -27,7 +31,7 @@ export const BallLoose = trait();
 export const CarriedBy = relation({ exclusive: true });
 export const IsCarrier = trait();
 
-export type FlightResolutionKind = "received";
+export type FlightResolutionKind = "received" | "intercepted";
 export const BallFlight = trait({
   fromX: 0,
   fromZ: 0,
@@ -48,7 +52,11 @@ export const IsReceiver = trait();
 export const IsChaser = trait();
 export const ChaseReassignCooldown = trait({ remainingSeconds: 0 });
 
-export const CarrierDecision = trait({ thinkRemainingSeconds: 0 });
+export const CarrierDecision = trait({ remainingSeconds: 0 });
 export const LastPassFrom = relation({ exclusive: true });
+export const DribbleTarget = trait({ x: 0, z: 0 });
+export const DribbleSpeedFactor = trait({ factor: 1 });
+export const ContestTimer = trait({ remainingSeconds: 0 });
+export const ClaimLockout = trait({ remainingSeconds: 0 });
 
 export const MatchRandom = trait({ state: 0 });

@@ -1,5 +1,5 @@
 import { createWorld, type Entity, type World } from "koota";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GAME_CONFIG } from "../../data/game-config";
 import {
   IsPlayer,
@@ -11,15 +11,20 @@ import {
   TeamSide,
   type TeamSideId,
 } from "../traits";
-import type { PassCandidate } from "./candidates";
+import type { DribbleCandidate, PassCandidate } from "./candidates";
 import { scoreCarrierCandidate } from "./scoring";
 
 const CARRIER_AI = GAME_CONFIG.CARRIER_AI;
+const CLEARING = GAME_CONFIG.CLEARING;
 
 let world: World;
 
 beforeEach(() => {
   world = createWorld();
+});
+
+afterEach(() => {
+  world.destroy();
 });
 
 function spawnPlayerAt(x: number, z: number, side: TeamSideId): Entity {
@@ -41,6 +46,10 @@ function passTo(receiver: Entity): PassCandidate {
     target: { x: position.x, z: position.z },
     flavor: "ground",
   };
+}
+
+function dribbleTo(x: number, z: number): DribbleCandidate {
+  return { kind: "dribble", target: { x, z } };
 }
 
 describe("scoreCarrierCandidate", () => {
@@ -98,6 +107,24 @@ describe("scoreCarrierCandidate", () => {
     expect(forwardScore).toBeGreaterThan(backwardScore);
   });
 
+  it("avoids passes through guarded lanes", () => {
+    const carrier = spawnPlayerAt(0, 0, "home");
+    const clearLaneTeammate = spawnPlayerAt(20, 10, "home");
+    const guardedLaneTeammate = spawnPlayerAt(20, -10, "home");
+    spawnPlayerAt(10, -5, "away");
+    const clearScore = scoreCarrierCandidate(
+      world,
+      carrier,
+      passTo(clearLaneTeammate),
+    );
+    const guardedScore = scoreCarrierCandidate(
+      world,
+      carrier,
+      passTo(guardedLaneTeammate),
+    );
+    expect(clearScore).toBeGreaterThan(guardedScore);
+  });
+
   it("penalizes returning the ball to the last passer", () => {
     const carrier = spawnPlayerAt(0, 0, "home");
     const teammate = spawnPlayerAt(15, 0, "home");
@@ -106,6 +133,86 @@ describe("scoreCarrierCandidate", () => {
     const returnScore = scoreCarrierCandidate(world, carrier, passTo(teammate));
     expect(freshScore - returnScore).toBeCloseTo(
       CARRIER_AI.WEIGHT_BACKPASS_PENALTY,
+    );
+  });
+});
+
+describe("dribble scoring", () => {
+  it("prefers probes into open space over crowded ones", () => {
+    const carrier = spawnPlayerAt(0, 0, "home");
+    spawnPlayerAt(8, 2, "away");
+    const crowdedScore = scoreCarrierCandidate(world, carrier, dribbleTo(8, 0));
+    const openScore = scoreCarrierCandidate(world, carrier, dribbleTo(8, -10));
+    expect(openScore).toBeGreaterThan(crowdedScore);
+  });
+
+  it("prefers forward probes at equal space", () => {
+    const carrier = spawnPlayerAt(0, 0, "home");
+    const forwardScore = scoreCarrierCandidate(world, carrier, dribbleTo(8, 0));
+    const sidewaysScore = scoreCarrierCandidate(
+      world,
+      carrier,
+      dribbleTo(0, 8),
+    );
+    expect(forwardScore).toBeGreaterThan(sidewaysScore);
+  });
+
+  it("boosts escaping into open space while pressured", () => {
+    const carrier = spawnPlayerAt(0, 0, "home");
+    const calmScore = scoreCarrierCandidate(world, carrier, dribbleTo(8, 0));
+    spawnPlayerAt(-2, 0, "away");
+    const pressuredScore = scoreCarrierCandidate(
+      world,
+      carrier,
+      dribbleTo(8, 0),
+    );
+    expect(pressuredScore).toBeGreaterThan(calmScore);
+  });
+
+  it("flips the choice from a pass to an escape dribble under pressure", () => {
+    const carrier = spawnPlayerAt(0, 0, "home");
+    const teammate = spawnPlayerAt(15, 0, "home");
+    const calmPass = scoreCarrierCandidate(world, carrier, passTo(teammate));
+    const calmDribble = scoreCarrierCandidate(world, carrier, dribbleTo(8, 0));
+    expect(calmPass).toBeGreaterThan(calmDribble);
+    spawnPlayerAt(-2, 0, "away");
+    const pressuredPass = scoreCarrierCandidate(
+      world,
+      carrier,
+      passTo(teammate),
+    );
+    const pressuredDribble = scoreCarrierCandidate(
+      world,
+      carrier,
+      dribbleTo(8, 0),
+    );
+    expect(pressuredDribble).toBeGreaterThan(pressuredPass);
+  });
+});
+
+describe("clear scoring", () => {
+  const clearCandidate = { kind: "clear", target: { x: 0, z: 0 } } as const;
+
+  it("beats hold when pressured deep in the own third", () => {
+    const carrier = spawnPlayerAt(-48, 0, "home");
+    spawnPlayerAt(-47.5, 0, "away");
+    expect(scoreCarrierCandidate(world, carrier, clearCandidate)).toBeGreaterThan(
+      0,
+    );
+  });
+
+  it("stays below hold when unpressured", () => {
+    const carrier = spawnPlayerAt(-48, 0, "home");
+    expect(scoreCarrierCandidate(world, carrier, clearCandidate)).toBe(
+      CLEARING.BASE_SCORE,
+    );
+  });
+
+  it("stays below hold when pressured outside the panic third", () => {
+    const carrier = spawnPlayerAt(0, 0, "home");
+    spawnPlayerAt(0.5, 0, "away");
+    expect(scoreCarrierCandidate(world, carrier, clearCandidate)).toBe(
+      CLEARING.BASE_SCORE,
     );
   });
 });

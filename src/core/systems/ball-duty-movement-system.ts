@@ -1,6 +1,7 @@
-import type { World } from "koota";
+import { Not, type World } from "koota";
 import {
   BallFlight,
+  DribbleTarget,
   IsBall,
   IsCarrier,
   IsChaser,
@@ -24,10 +25,16 @@ export function ballDutyMovementSystem(world: World) {
     target.x = ballPosition.x;
     target.z = ballPosition.z;
   });
-  world.query(IsCarrier, Position, TargetPosition).updateEach(
-    ([position, target]) => {
+  world
+    .query(IsCarrier, DribbleTarget, TargetPosition)
+    .updateEach(([dribble, target]) => {
+      target.x = dribble.x;
+      target.z = dribble.z;
+    });
+  world
+    .query(IsCarrier, Not(DribbleTarget), Position, TargetPosition)
+    .updateEach(([position, target]) => {
       target.x = position.x;
       target.z = position.z;
-    },
-  );
+    });
 }

@@ -85,7 +85,7 @@ No behavior trees, no pathfinding/navmesh (straight-line movement is fine on an 
 | `FlightResolution` | data | `claimant: Entity, kind: 'received' \| 'intercepted' \| 'goal' \| 'saved' \| 'offTarget'` | ball (during flight) |
 | `BallRoll` | data | `vx, vz` | ball (while loose) |
 | `IsCarrier` / `IsReceiver` / `IsChaser` | duty tags | — | players |
-| `CarrierDecision` | data | `thinkRemainingSeconds` | carrier |
+| `CarrierDecision` | data | `remainingSeconds` | carrier |
 | `LastPassFrom` | data | `passer: Entity` | carrier (anti-ping-pong memory) |
 | `MatchRandom` | world singleton | `state` | world |
 | `MatchClock` | world singleton | `matchSeconds, isRunning` | world |
@@ -240,7 +240,13 @@ Conventions for every step: all constants go to `GAME_CONFIG` (values below are 
 
 ---
 
-### M1.6 — Interception: passes can fail
+### M1.6 — Interception: passes can fail ✅
+
+> Implementation notes: shared lane math lives in `core/interception.ts` (with `projectOntoSegment` in `core/math.ts`) — `kickPass` pre-resolution and `scoring.ts` lane risk both consume it, so the AI sees exactly the odds the dice use. The interceptor is the highest-chance threat (deterministic argmax); the flight is shortened to that threat's lane projection. `LastPassFrom` is stamped only on `kind: 'received'`. `PassResolved` deferred to M1.11 like `PassKicked` (Rule 13 — no consumer until `statsPhase`).
+>
+> A cut point only counts when it sits at least `LANE_ENTRY_MARGIN_M` (2m) from **both** ends of the lane. Without that guard `projectOntoSegment`'s endpoint clamping made every opponent within `LANE_RADIUS_M` of the passer — including one standing *behind* them — project onto the ball itself, collect the full `EARLY_LANE_BONUS`, and win the argmax: a marker 1m behind the carrier stole 131 of 200 passes via a zero-duration flight to the carrier's own feet, in whatever direction the pass was aimed. It also double-counted the same defender that `ballContestSystem` is already rolling against, and the mirror case at `progress = 1` double-counted receiver marking, which `receiverOpenness` already scores. `laneThreatChance` is clamped to `[0, 1]` so tuning `BASE_CHANCE + EARLY_LANE_BONUS` past 1 cannot invert `combinedInterceptionChance`.
+>
+> Tuning deviation, found by parameter sweep: because carriers dodge the very risk model that resolves kicks, spec values (radius 3, full-weight risk) yielded 97% completion and almost no turnovers; shipped `LANE_RADIUS_M: 6.0`, new `CARRIER_AI.WEIGHT_LANE_RISK: 0.4`, and `PICK_TEMPERATURE: 0.25`. The smoke band test aggregates seeds {42, 7, 1234}; current totals are 81 kicks / 18 intercepted (0.778 completion), 61 completed passes, 24 turnovers, 5 dispossessions, with intercept travel spanning 2.2m–36.3m. Also fixed `choose-carrier-action` to read config through the live sub-object (it had snapshotted the primitive, which would have hidden runtime tuning).
 
 **Goal:** possession changes hands organically; the match becomes a contest.
 
@@ -256,7 +262,17 @@ Conventions for every step: all constants go to `GAME_CONFIG` (values below are 
 
 ---
 
-### M1.7 — Dribbling and pressure
+### M1.7 — Dribbling and pressure ✅
+
+> Implementation notes: contest logic shipped as its own `ballContestSystem` (between `movementSystem` and `ballCarrySystem`), owning `ContestTimer` and the new `ClaimLockout` trait. The lockout is an off-spec necessity: the squirted ball starts at the victim's feet, so without a 0.5s claim lockout on the dispossessed player, `looseBallSystem` handed the ball straight back next tick and tackles never stuck — `looseBallSystem` now claims for the nearest player passing an `isEligible` predicate on `NearestPlayerRequest`, which rejects anyone still locked out.
+>
+> Pressure reads live in `core/pressure.ts`: `pressureOn(world, player)` (linear falloff to `RADIUS_M`) and `isUnderTacklePressure(world, player)` (inside `TACKLE_RADIUS_M`), both over one `nearestOpponentDistance` helper. Pressure is read on the **carrier** and multiplies pass openness by `(1 - pressure)` — receiver marking is already the openness term itself, and this reading is what produces "swarmed midfielder stops threading passes, escapes or loses it".
+>
+> Dribbling executes via `DribbleTarget` + `DribbleSpeedFactor` traits set by `startDribble` (cleared by `stopDribble` / `stripCarrierDuty`, which now bundles every carrier-loss path in `claimBall`/`releaseBallLoose`/`kickPass`); picking `hold` stops an in-progress dribble. The speed trait is deliberately dribble-scoped, not a generic `MoveSpeedFactor`: its owner `remove`s it outright on every dribble stop and possession loss, so a shared trait would silently wipe any future sprint/stamina modifier. When a second modifier lands, replace it with a multiplicative stack rather than a second writer.
+>
+> Clear is `kickClear` = lofted `kickPass` at a pitch-clamped point `CLEARING.DISTANCE_M` upfield, scored `WEIGHT × pressure × own-third deepness + BASE_SCORE (-0.5)` so it stays below hold except in genuine panic; `clearCandidates` drops it when the clamped target lands inside `PASSING.MIN_DISTANCE_M`, matching how `passFlavorForDistance` gates passes. GKs get no dribble probes (pre-empting GK suicide until D5's distribution brain in M1.8). `core/pitch.ts` extracted (`clampToPitch`/`isWithinPitch`/`OWN_GOAL_LINE_X`), shared by positioning, probe generation and clear scoring. `scoreCarrierCandidate` dispatches every union member explicitly and funnels the fallthrough into a `never` parameter, so a new candidate kind is a compile error rather than a silent mis-score. The four countdown traits (`ChaseReassignCooldown`, `CarrierDecision`, `ContestTimer`, `ClaimLockout`) share `core/countdown.ts` — `tickCountdown` for the per-owner ones, `expireCountdowns` for the query-wide lockout drain.
+>
+> Tuning by sweep (deleted after): dribble weights shipped `WEIGHT_SPACE 0.5→0.3, WEIGHT_PROGRESSION 0.6→0.4, WEIGHT_ESCAPE 0.6` — heavier values collapsed passing to 29 completed per 3 seeds; spec `TACKLE_RADIUS_M 1.5` + `CONTEST_INTERVAL_SECONDS 0.6` yielded ~0–1 dispossessions per 3 matches (nobody presses the carrier yet — defenders only approach via formation ball-pull, so 1.5m-for-0.6s almost never held); shipped `2.5` + `0.4`. Smoke floor adjusted 60→45 completed passes (dribbles legitimately replace passes) and now asserts ≥3 dispossessions. No `Dispossessed` event yet — Rule 13, no consumer until M1.11's `statsPhase`, same deferral as `PassKicked`/`PassResolved`.
 
 **Goal:** carriers advance with the ball when unpressured and get punished for holding it under pressure.
 

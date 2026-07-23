@@ -1,7 +1,13 @@
 import type { Entity, TraitRecord, World } from "koota";
 import { GAME_CONFIG } from "../../data/game-config";
+import {
+  combinedInterceptionChance,
+  findLaneThreats,
+  likeliestInterceptor,
+} from "../interception";
 import { displacement2D, type Point2D } from "../math";
 import { findNearestPlayer } from "../queries";
+import { randomChance } from "../random";
 import {
   BallCarried,
   BallFlight,
@@ -9,12 +15,18 @@ import {
   CarriedBy,
   FlightResolution,
   IsBall,
-  IsCarrier,
   LastPassFrom,
   Position,
   TeamSide,
+  type FlightResolutionKind,
+  type TeamSideId,
 } from "../traits";
-import { claimBall, releaseBallLoose, type RollVelocity } from "./ball-control";
+import {
+  claimBall,
+  releaseBallLoose,
+  stripCarrierDuty,
+  type RollVelocity,
+} from "./ball-control";
 
 const PASSING = GAME_CONFIG.PASSING;
 const CLAIM_REACH_M =
@@ -44,14 +56,13 @@ export function kickPass(
   if (!ball) return;
   if (ball.targetFor(CarriedBy) !== kicker) return;
   const ballPosition = ball.get(Position);
-  if (!ballPosition) return;
-  const { distance } = displacement2D(ballPosition, target);
-  if (distance < PASSING.MIN_DISTANCE_M) return;
   const side = kicker.get(TeamSide)?.side;
-  const claimant = side
-    ? findNearestPlayer(world, { point: target, side, exclude: kicker })
-    : undefined;
-  kicker.remove(IsCarrier);
+  if (!ballPosition || !side) return;
+  if (displacement2D(ballPosition, target).distance < PASSING.MIN_DISTANCE_M) {
+    return;
+  }
+  const outcome = resolvePassOutcome(world, ballPosition, target, side, kicker);
+  stripCarrierDuty(kicker);
   ball.remove(CarriedBy(kicker));
   ball.remove(BallCarried);
   ball.add(
@@ -59,18 +70,62 @@ export function kickPass(
     BallFlight({
       fromX: ballPosition.x,
       fromZ: ballPosition.z,
-      toX: target.x,
-      toZ: target.z,
+      toX: outcome.destination.x,
+      toZ: outcome.destination.z,
       elapsedSeconds: 0,
-      durationSeconds: distance / passSpeed(flavor),
+      durationSeconds:
+        displacement2D(ballPosition, outcome.destination).distance /
+        passSpeed(flavor),
       arcHeight: passArcHeight(flavor),
     }),
     FlightResolution({
-      claimant: claimant ?? kicker,
+      claimant: outcome.claimant,
       passer: kicker,
-      kind: "received",
+      kind: outcome.kind,
     }),
   );
+}
+
+export function kickClear(world: World, kicker: Entity, target: Point2D) {
+  kickPass(world, kicker, target, "lofted");
+}
+
+interface PassOutcome {
+  claimant: Entity;
+  kind: FlightResolutionKind;
+  destination: Point2D;
+}
+
+function resolvePassOutcome(
+  world: World,
+  from: Point2D,
+  target: Point2D,
+  side: TeamSideId,
+  kicker: Entity,
+): PassOutcome {
+  const threats = findLaneThreats(world, from, target, side);
+  const isIntercepted = randomChance(
+    world,
+    combinedInterceptionChance(threats),
+  );
+  const interceptor = isIntercepted ? likeliestInterceptor(threats) : undefined;
+  if (interceptor) {
+    return {
+      claimant: interceptor.opponent,
+      kind: "intercepted",
+      destination: interceptor.interceptPoint,
+    };
+  }
+  const receiver = findNearestPlayer(world, {
+    point: target,
+    side,
+    exclude: kicker,
+  });
+  return {
+    claimant: receiver ?? kicker,
+    kind: "received",
+    destination: target,
+  };
 }
 
 export function resolveFlightArrival(world: World, ball: Entity) {
@@ -86,7 +141,9 @@ export function resolveFlightArrival(world: World, ball: Entity) {
     displacement2D(claimantPosition, landingPoint).distance <= CLAIM_REACH_M;
   if (claimantCanReach) {
     claimBall(world, resolution.claimant);
-    rememberPassOrigin(resolution.claimant, resolution.passer);
+    if (resolution.kind === "received") {
+      rememberPassOrigin(resolution.claimant, resolution.passer);
+    }
     return;
   }
   releaseBallLoose(world, roll);

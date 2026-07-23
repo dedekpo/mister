@@ -4,7 +4,7 @@ import { randomRange } from "../random";
 import type { CarrierActionCandidate } from "./candidates";
 import type { ScoredCandidate } from "./scoring";
 
-const PICK_TEMPERATURE = GAME_CONFIG.CARRIER_AI.PICK_TEMPERATURE;
+const CARRIER_AI = GAME_CONFIG.CARRIER_AI;
 
 export function chooseCarrierAction(
   world: World,
@@ -15,7 +15,12 @@ export function chooseCarrierAction(
   let bestNoisyScore = -Infinity;
   scoredCandidates.forEach(({ candidate, score }) => {
     const noisyScore =
-      score + randomRange(world, -PICK_TEMPERATURE, PICK_TEMPERATURE);
+      score +
+      randomRange(
+        world,
+        -CARRIER_AI.PICK_TEMPERATURE,
+        CARRIER_AI.PICK_TEMPERATURE,
+      );
     if (noisyScore <= bestNoisyScore) return;
     bestCandidate = candidate;
     bestNoisyScore = noisyScore;

@@ -1,5 +1,5 @@
 import { createWorld, type World } from "koota";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { spawnMatch } from "../actions/match-flow";
 import {
   IsCarrier,
@@ -16,6 +16,10 @@ let world: World;
 beforeEach(() => {
   world = createWorld();
   spawnMatch(world);
+});
+
+afterEach(() => {
+  world.destroy();
 });
 
 describe("positioningSystem duty exemptions", () => {

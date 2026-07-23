@@ -1,6 +1,8 @@
 import { createWorld, type Entity, type World } from "koota";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { GAME_CONFIG } from "../../data/game-config";
+import { gameplayEventPhase } from "../events/gameplay-event-phase";
+import { seedMatchRandom } from "../random";
 import {
   BallCarried,
   BallFlight,
@@ -13,6 +15,7 @@ import {
   LastPassFrom,
   PlayerRole,
   Position,
+  Possession,
   Speed,
   TargetPosition,
   TeamSide,
@@ -28,6 +31,10 @@ let world: World;
 beforeEach(() => {
   world = createWorld();
   world.spawn(IsBall, Position({ x: 0, y: GAME_CONFIG.BALL.RADIUS, z: 0 }));
+});
+
+afterEach(() => {
+  world.destroy();
 });
 
 function spawnPlayerAt(x: number, z: number, side: TeamSideId): Entity {
@@ -71,7 +78,7 @@ describe("kickPass", () => {
     const kicker = spawnPlayerAt(0, 0, "home");
     const nearTeammate = spawnPlayerAt(20, 2, "home");
     spawnPlayerAt(40, 0, "home");
-    spawnPlayerAt(19, 0, "away");
+    spawnPlayerAt(19, 8, "away");
     giveBallTo(world, kicker);
     kickPass(world, kicker, { x: 20, z: 0 }, "ground");
     expect(ball().get(FlightResolution)?.claimant).toBe(nearTeammate);
@@ -95,16 +102,74 @@ describe("kickPass", () => {
   });
 });
 
+describe("pre-resolved interception", () => {
+  function kickThroughGuardedLane(seed: number) {
+    world.destroy();
+    world = createWorld();
+    seedMatchRandom(world, seed);
+    world.spawn(IsBall, Position({ x: 0, y: GAME_CONFIG.BALL.RADIUS, z: 0 }));
+    const kicker = spawnPlayerAt(0, 0, "home");
+    spawnPlayerAt(20, 0, "home");
+    const lurker = spawnPlayerAt(10, 1, "away");
+    giveBallTo(world, kicker);
+    gameplayEventPhase(world);
+    kickPass(world, kicker, { x: 20, z: 0 }, "ground");
+    return lurker;
+  }
+
+  function firstInterceptedLane() {
+    for (let seed = 1; seed <= 100; seed += 1) {
+      const lurker = kickThroughGuardedLane(seed);
+      if (ball().get(FlightResolution)?.kind === "intercepted") return lurker;
+    }
+    throw new Error("no interception in 100 seeds");
+  }
+
+  it("rolls both outcomes and shortens intercepted flights to the cut point", () => {
+    let interceptedCount = 0;
+    let receivedCount = 0;
+    for (let seed = 1; seed <= 40; seed += 1) {
+      const lurker = kickThroughGuardedLane(seed);
+      const resolution = ball().get(FlightResolution)!;
+      const flight = ball().get(BallFlight)!;
+      if (resolution.kind === "received") {
+        receivedCount += 1;
+        expect(flight.toX).toBe(20);
+        continue;
+      }
+      interceptedCount += 1;
+      expect(resolution.claimant).toBe(lurker);
+      expect(flight.toX).toBeCloseTo(10);
+      expect(flight.toZ).toBeCloseTo(0);
+      expect(flight.durationSeconds).toBeCloseTo(
+        10 / PASSING.GROUND_SPEED_MPS,
+      );
+    }
+    expect(interceptedCount).toBeGreaterThan(0);
+    expect(receivedCount).toBeGreaterThan(0);
+  });
+
+  it("lets the interceptor claim without pass memory and flips possession", () => {
+    const lurker = firstInterceptedLane();
+    resolveFlightArrival(world, ball());
+    expect(ball().targetFor(CarriedBy)).toBe(lurker);
+    expect(lurker.targetFor(LastPassFrom)).toBeUndefined();
+    gameplayEventPhase(world);
+    expect(world.get(Possession)?.side).toBe("away");
+  });
+});
+
 describe("interrupted flights", () => {
   it("kicks fresh after a mid-flight claim wiped the previous flight", () => {
     const kicker = spawnPlayerAt(0, 0, "home");
     spawnPlayerAt(30, 0, "home");
-    const thief = spawnPlayerAt(5, 5, "away");
+    const thief = spawnPlayerAt(5, 8, "away");
     giveBallTo(world, kicker);
     kickPass(world, kicker, { x: 30, z: 0 }, "ground");
     claimBall(world, thief);
     expect(ball().has(BallFlight)).toBe(false);
     expect(ball().has(FlightResolution)).toBe(false);
+    kicker.set(Position, { x: -40, y: 0, z: -20 });
     kickPass(world, thief, { x: 5, z: -15 }, "ground");
     const flight = ball().get(BallFlight)!;
     expect(flight.toX).toBe(5);

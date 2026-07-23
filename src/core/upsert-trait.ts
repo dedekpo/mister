@@ -1,6 +1,6 @@
 import type { ConfigurableTrait, ExtractSchema, Trait, TraitValue } from "koota";
 
-interface TraitContainer {
+export interface TraitContainer {
   has(trait: Trait): boolean;
   add(...traits: ConfigurableTrait[]): void;
   set<T extends Trait>(trait: T, value: TraitValue<ExtractSchema<T>>): void;
